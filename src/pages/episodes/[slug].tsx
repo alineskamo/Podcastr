@@ -2,8 +2,10 @@ import format from 'date-fns/format';
 import { ptBR } from 'date-fns/locale';
 import parseISO from 'date-fns/parseISO';
 import { GetStaticPaths, GetStaticProps } from 'next';
+import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePlayer } from '../../contexts/PlayerContext';
 import { api } from '../../services/api';
 import { convertDurationToTimeString } from '../../utils/convertDurationToTimeString';
 
@@ -14,7 +16,7 @@ type Episode = {
     title: string;
     thumbnail: string;
     members: string;
-    duration: string;
+    duration: number;
     durationAsString: string;
     url: string;
     publishedAt: string;
@@ -26,22 +28,28 @@ type EpisodeProps = {
 }
 
 export default function Episode({ episode }: EpisodeProps) {
+    const { play } = usePlayer();
+
     return (
         <div className={styles.episode}>
+            <Head>
+                <title>{episode.title} | Podcastr</title>
+            </Head>
+
             <div className={styles.thumbnailContainer}>
                 <Link href="/">
-                <button type='button'>
-                    <img src="/arrow-left.svg" alt="Voltar"/>
-                </button>
+                    <button type='button'>
+                        <img src="/arrow-left.svg" alt="Voltar" />
+                    </button>
                 </Link>
-                <Image 
-                width={700} 
-                height={160} 
-                src={episode.thumbnail} 
-                objectFit='cover' 
+                <Image
+                    width={700}
+                    height={160}
+                    src={episode.thumbnail}
+                    objectFit='cover'
                 />
-                <button type='button'>
-                    <img src="/play.svg" alt="Tocar episódio"/>
+                <button type='button' onClick={() => play(episode)}>
+                    <img src="/play.svg" alt="Tocar episódio" />
                 </button>
             </div>
 
@@ -52,21 +60,38 @@ export default function Episode({ episode }: EpisodeProps) {
                 <span>{episode.durationAsString}</span>
             </header>
 
-            <div 
-            className={styles.description}
-            dangerouslySetInnerHTML= {{ __html: episode.description}} 
+            <div
+                className={styles.description}
+                dangerouslySetInnerHTML={{ __html: episode.description }}
             />
 
         </div>
     )
 }
 
-export const getStaticPaths: GetStaticPaths = async() => {
+export const getStaticPaths: GetStaticPaths = async () => {
+    const { data } = await api.get('episodes', {
+        params: {
+            _limit: 12,
+            _sort: 'published_at',
+            _order: 'desc'
+        }
+    })
+
+    const paths = data.map(episode => {
+        return {
+            params: {
+                slug: episode.id
+            }
+        }
+
+    })
+
     return {
-        paths: [],
+        paths,
         fallback: 'blocking'
     }
-
+    // incremental static generation
 }
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
@@ -85,7 +110,7 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
         description: data.description,
         url: data.file.url,
     }
-    
+
     return {
         props: {
             episode
